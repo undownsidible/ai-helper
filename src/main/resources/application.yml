@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/ai_helper?serverTimezone=Asia/Shanghai
+    username: root
+    password: Sql0785106078
+
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+
+  knife4j:
+    enable: true
+    setting:
+      language: zh-CN
+
+mybatis:
+  #mapper配置文件
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.sky.entity
+  configuration:
+    #开启驼峰命名
+    map-underscore-to-camel-case: true

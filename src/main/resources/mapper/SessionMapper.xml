@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.aihelper.server.mapper.SessionMapper">
+
+    <!-- 新建会话 -->
+    <insert id="insert" parameterType="com.example.aihelper.pojo.entity.ChatSession" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO chat_session
+            (user_id, title, create_time, update_time)
+        VALUES
+            (#{userId}, #{title}, #{createTime}, #{updateTime})
+    </insert>
+
+    <!-- 根据用户查询会话 -->
+    <select id="selectByUserId"
+            parameterType="long"
+            resultType="com.example.aihelper.pojo.entity.ChatSession">
+
+        SELECT
+            id,
+            user_id AS userId,
+            title,
+            create_time AS createTime,
+            update_time AS updateTime
+        FROM chat_session
+        WHERE user_id = #{userId}
+        ORDER BY update_time DESC
+
+    </select>
+
+    <!-- 删除会话 -->
+    <delete id="deleteByIdAndUserId">
+        DELETE FROM chat_session
+        WHERE id = #{sessionId}
+          AND user_id = #{userId}
+    </delete>
+
+</mapper>
