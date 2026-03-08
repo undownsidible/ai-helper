@@ -31,11 +31,14 @@
 
     </select>
 
+
+    <select id="getById" resultType="com.example.aihelper.pojo.entity.ChatSession">
+        select * from chat_session where id = #{id}
+    </select>
+
     <!-- 删除会话 -->
-    <delete id="deleteByIdAndUserId">
-        DELETE FROM chat_session
-        WHERE id = #{sessionId}
-          AND user_id = #{userId}
+    <delete id="deleteById">
+        delete from chat_session where id = #{id}
     </delete>
 
 </mapper>

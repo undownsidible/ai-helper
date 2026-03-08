@@ -13,6 +13,7 @@ public interface SessionMapper {
 
     List<ChatSession> selectByUserId(Long userId);
 
-    void deleteByIdAndUserId(@Param("sessionId") Long sessionId,
-                             @Param("userId") Long userId);
+    ChatSession getById(Long id);
+
+    void deleteById(Long id);
 }
