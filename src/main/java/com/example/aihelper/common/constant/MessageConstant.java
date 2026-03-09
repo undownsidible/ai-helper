@@ -12,4 +12,6 @@ public class MessageConstant {
     public static final String TOKEN_ERROR = "token无效";
     public static final String SESSION_NOT_FOUND = "会话不存在";
     public static final String NO_RIGHT = "没有权限";
+    public static final String USER = "用户:";
+    public static final String ASSISTANT = "助手:";
 }
