@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.aihelper.server.mapper.ScheduleMapper">
+
+    <!-- 插入日程 -->
+    <insert id="insert" parameterType="com.example.aihelper.pojo.entity.Schedule">
+        INSERT INTO schedule
+        (
+        user_id,
+        name,
+        start_time,
+        end_time,
+        remark,
+        deleted,
+        create_time,
+        update_time
+        )
+        VALUES
+        (
+        #{userId},
+        #{name},
+        #{startTime},
+        #{endTime},
+        #{remark},
+        #{deleted},
+        #{createTime},
+        #{updateTime}
+        )
+    </insert>
+
+    <!-- 查询用户日程 -->
+    <select id="listByUserId"
+            parameterType="java.lang.Long"
+            resultType="com.example.aihelper.pojo.entity.Schedule">
+
+        SELECT
+        id,
+        user_id,
+        name,
+        start_time,
+        end_time,
+        remark,
+        deleted,
+        create_time,
+        update_time
+        FROM schedule
+        WHERE user_id = #{userId}
+        AND deleted = 0
+        ORDER BY start_time ASC
+
+    </select>
+
+    <!-- 查询今日日程 -->
+    <select id="getTodaySchedule"
+            resultType="com.example.aihelper.pojo.entity.Schedule">
+
+        SELECT *
+        FROM schedule
+        WHERE user_id = #{userId}
+          AND deleted = 0
+          AND start_time &gt;= #{start}
+          AND start_time &lt; #{end}
+        ORDER BY start_time
+
+    </select>
+
+    <!-- 检查日程冲突 -->
+    <select id="checkScheduleConflict"
+            resultType="com.example.aihelper.pojo.entity.Schedule">
+
+        SELECT *
+        FROM schedule
+        WHERE user_id = #{userId}
+          AND deleted = 0
+          AND start_time &lt; #{endTime}
+          AND end_time &gt; #{startTime}
+
+    </select>
+    <!-- 更新日程 -->
+    <update id="update" parameterType="com.example.aihelper.pojo.entity.Schedule">
+
+        UPDATE schedule
+        SET
+        name = #{name},
+        start_time = #{startTime},
+        end_time = #{endTime},
+        remark = #{remark},
+        update_time = #{updateTime}
+        WHERE id = #{id}
+
+    </update>
+
+    <!-- 软删除日程 -->
+    <update id="delete" parameterType="java.lang.Long">
+
+        UPDATE schedule
+        SET
+        deleted = 1,
+        update_time = NOW()
+        WHERE id = #{id}
+
+    </update>
+
+
+</mapper>

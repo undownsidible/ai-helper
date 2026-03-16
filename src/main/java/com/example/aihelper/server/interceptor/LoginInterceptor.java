@@ -3,9 +3,9 @@ package com.example.aihelper.server.interceptor;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.example.aihelper.common.constant.MessageConstant;
+import com.example.aihelper.common.context.UserContext;
 import com.example.aihelper.common.exception.NotLoginException;
 import com.example.aihelper.common.exception.TokenError;
-import com.example.aihelper.common.context.UserContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -20,6 +20,7 @@ public class LoginInterceptor implements HandlerInterceptor {
                              HttpServletResponse response,
                              Object handler) {
 
+        // 从请求头获取token
         String token = request.getHeader("token");
 
         if (token == null || token.isEmpty()) {
@@ -41,6 +42,7 @@ public class LoginInterceptor implements HandlerInterceptor {
             // 保存到ThreadLocal
             log.info("线程id:{}", Thread.currentThread().getId());
             UserContext.setUserId(userId);
+
         } catch (Exception e) {
             throw new TokenError(MessageConstant.TOKEN_ERROR);
         }

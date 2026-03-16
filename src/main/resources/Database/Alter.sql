@@ -1,0 +1,2 @@
+ALTER TABLE schedule
+    ADD COLUMN deleted TINYINT DEFAULT 0;

@@ -8,69 +8,81 @@ import com.example.aihelper.server.mapper.ChatMessageMapper;
 import com.example.aihelper.server.mapper.SessionMapper;
 import com.example.aihelper.server.service.AIService;
 import com.example.aihelper.server.service.ChatService;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 
+@Slf4j
 @Service
 public class ChatServiceImpl implements ChatService {
 
     @Autowired
     private ChatMessageMapper chatMessageMapper;
+
     @Autowired
     private SessionMapper sessionMapper;
 
     @Autowired
     private AIService aiService;
 
+    // 历史消息限制
+    private static final int MAX_HISTORY = 10;
 
     @Override
     public String send(ChatSendDTO dto) {
-        //检查会话是否存在
-        if (sessionMapper.getById(dto.getSessionId()) == null){
-            throw new  SessionNotFoundException(MessageConstant.SESSION_NOT_FOUND);
+
+        if (sessionMapper.getById(dto.getSessionId()) == null) {
+            throw new SessionNotFoundException(MessageConstant.SESSION_NOT_FOUND);
         }
 
-        //设置用户消息
         ChatMessage userMsg = new ChatMessage();
         userMsg.setSessionId(dto.getSessionId());
         userMsg.setRole("user");
         userMsg.setContent(dto.getContent());
 
-        //拼接历史消息
-        List<ChatMessage> history = chatMessageMapper.listBySessionId(dto.getSessionId());
+        chatMessageMapper.insert(userMsg);
+
+        List<ChatMessage> history =
+                chatMessageMapper.listRecentBySessionId(dto.getSessionId(), MAX_HISTORY);
+
+        Collections.reverse(history);
 
         StringBuilder promptBuilder = new StringBuilder();
 
-        for (ChatMessage msg : history) {
+        int start = Math.max(0, history.size() - MAX_HISTORY);
+
+        for (int i = start; i < history.size(); i++) {
+
+            ChatMessage msg = history.get(i);
 
             if ("user".equals(msg.getRole())) {
-                promptBuilder.append(MessageConstant.USER).append(msg.getContent()).append("\n");
+                promptBuilder.append(MessageConstant.USER)
+                        .append(msg.getContent())
+                        .append("\n");
             } else {
-                promptBuilder.append(MessageConstant.ASSISTANT).append(msg.getContent()).append("\n");
+                promptBuilder.append(MessageConstant.ASSISTANT)
+                        .append(msg.getContent())
+                        .append("\n");
             }
         }
 
-        promptBuilder.append(MessageConstant.USER).append(dto.getContent()).append("\n");
+        promptBuilder.append(MessageConstant.USER)
+                .append(dto.getContent())
+                .append("\n");
+
         promptBuilder.append(MessageConstant.ASSISTANT);
 
         String prompt = promptBuilder.toString();
 
-        //保存用户消息
-        chatMessageMapper.insert(userMsg);
+        log.info("调用AI");
 
-        // 调用 AI
         String reply = aiService.chat(prompt);
 
-        // 保存 AI 回复
         ChatMessage aiMsg = new ChatMessage();
         aiMsg.setSessionId(dto.getSessionId());
         aiMsg.setRole("assistant");
@@ -81,71 +93,93 @@ public class ChatServiceImpl implements ChatService {
         return reply;
     }
 
+    @Override
     public void streamChat(ChatSendDTO dto, SseEmitter emitter) {
-        //检查会话是否存在
-        if (sessionMapper.getById(dto.getSessionId()) == null){
-            throw new  SessionNotFoundException(MessageConstant.SESSION_NOT_FOUND);
+
+        if (sessionMapper.getById(dto.getSessionId()) == null) {
+            throw new SessionNotFoundException(MessageConstant.SESSION_NOT_FOUND);
         }
-        new Thread(() -> {
 
-            try {
+        ChatMessage userMsg = new ChatMessage();
+        userMsg.setSessionId(dto.getSessionId());
+        userMsg.setRole("user");
+        userMsg.setContent(dto.getContent());
 
-                URL url = new URL("http://localhost:11434/api/generate");
+        chatMessageMapper.insert(userMsg);
 
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setDoOutput(true);
-                conn.setRequestProperty("Content-Type", "application/json");
+        List<ChatMessage> history =
+                chatMessageMapper.listRecentBySessionId(dto.getSessionId(), MAX_HISTORY);
 
-                String body = """
-            {
-              "model":"qwen2",
-              "prompt":"%s",
-              "stream":true
+        Collections.reverse(history);
+
+        StringBuilder promptBuilder = new StringBuilder();
+
+        for (ChatMessage msg : history) {
+
+            if ("user".equals(msg.getRole())) {
+                promptBuilder.append(MessageConstant.USER)
+                        .append(msg.getContent())
+                        .append("\n");
+            } else {
+                promptBuilder.append(MessageConstant.ASSISTANT)
+                        .append(msg.getContent())
+                        .append("\n");
             }
-            """.formatted(dto.getContent());
+        }
 
-                conn.getOutputStream().write(body.getBytes());
+        promptBuilder.append(MessageConstant.USER)
+                .append(dto.getContent())
+                .append("\n");
 
-                BufferedReader reader =
-                        new BufferedReader(new InputStreamReader(conn.getInputStream()));
+        promptBuilder.append(MessageConstant.ASSISTANT);
 
-                ObjectMapper mapper = new ObjectMapper();
+        String prompt = promptBuilder.toString();
 
-                String line;
-                StringBuilder fullReply = new StringBuilder();
+        StringBuilder fullReply = new StringBuilder();
 
-                while ((line = reader.readLine()) != null) {
+        log.info("调用AI流式返回");
 
-                    JsonNode json = mapper.readTree(line);
+        aiService.streamChat(prompt, new AIService.StreamCallback() {
 
-                    if (json.has("response")) {
+            @Override
+            public void onMessage(String text) {
 
-                        String text = json.get("response").asText();
+                try {
 
-                        fullReply.append(text);
+                    fullReply.append(text);
 
-                        emitter.send(text);
-                    }
+                    emitter.send(text);
 
-                    if (json.has("done") && json.get("done").asBoolean()) {
-                        break;
-                    }
+                } catch (IOException e) {
+                    emitter.completeWithError(e);
                 }
-
-                emitter.complete();
-                //保存AI回复
-                ChatMessage aiMsg = new ChatMessage();
-                aiMsg.setSessionId(dto.getSessionId());
-                aiMsg.setRole("assistant");
-                aiMsg.setContent(fullReply.toString());
-
-                chatMessageMapper.insert(aiMsg);
-
-            } catch (Exception e) {
-                emitter.completeWithError(e);
             }
 
-        }).start();
+            @Override
+            public void onComplete() {
+
+                try {
+
+                    emitter.complete();
+
+                    ChatMessage aiMsg = new ChatMessage();
+                    aiMsg.setSessionId(dto.getSessionId());
+                    aiMsg.setRole("assistant");
+                    aiMsg.setContent(fullReply.toString());
+
+                    chatMessageMapper.insert(aiMsg);
+
+                } catch (Exception e) {
+                    emitter.completeWithError(e);
+                }
+            }
+        });
     }
+
+    @Override
+    public List<ChatMessage> listMessage(Long sessionId) {
+        return chatMessageMapper.listBySessionId(sessionId);
+    }
+
+
 }
