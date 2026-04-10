@@ -15,19 +15,27 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
-
 @Service
 public class AIServiceImpl implements AIService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
+    // ===== 统一配置 =====
+    private static final String BASE_URL = "http://localhost:11434";
+    private static final String GENERATE_API = "/api/generate";
+    private static final String MODEL = "qwen2";
+
+    private String getGenerateUrl() {
+        return BASE_URL + GENERATE_API;
+    }
+
     @Override
     public String chat(String prompt) {
 
-        String url = "http://localhost:11434/api/generate";
+        String url = getGenerateUrl();
 
         Map<String, Object> body = new HashMap<>();
-        body.put("model", "qwen2");
+        body.put("model", MODEL);
         body.put("prompt", prompt);
         body.put("stream", false);
 
@@ -35,6 +43,7 @@ public class AIServiceImpl implements AIService {
 
         return (String) response.get("response");
     }
+
     @Override
     public void streamChat(String prompt, StreamCallback callback) {
 
@@ -42,7 +51,7 @@ public class AIServiceImpl implements AIService {
 
             try {
 
-                URL url = new URL("http://localhost:11434/api/generate");
+                URL url = new URL(getGenerateUrl());
 
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
@@ -52,13 +61,13 @@ public class AIServiceImpl implements AIService {
                 ObjectMapper mapper = new ObjectMapper();
 
                 Map<String, Object> bodyMap = new HashMap<>();
-                bodyMap.put("model", "qwen2");
+                bodyMap.put("model", MODEL);
                 bodyMap.put("prompt", prompt);
                 bodyMap.put("stream", true);
 
                 String body = mapper.writeValueAsString(bodyMap);
 
-                try(OutputStream os = conn.getOutputStream()){
+                try (OutputStream os = conn.getOutputStream()) {
                     os.write(body.getBytes(StandardCharsets.UTF_8));
                 }
 
