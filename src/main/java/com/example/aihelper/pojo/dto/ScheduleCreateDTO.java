@@ -6,9 +6,6 @@ import java.time.LocalDateTime;
 
 @Data
 public class ScheduleCreateDTO {
-
-    private Long userId;
-
     // 日程名称
     private String name;
 

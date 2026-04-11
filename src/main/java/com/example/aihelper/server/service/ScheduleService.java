@@ -10,7 +10,9 @@ public interface ScheduleService {
 
     void createSchedule(ScheduleCreateDTO dto);
 
-    List<Schedule> listByUserId(Long userId);
+    List<Schedule> listByUserId();
+
+    List<Schedule> listByIds(List<Long> ids);
 
     void updateSchedule(ScheduleUpdateDTO dto);
 

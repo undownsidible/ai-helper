@@ -39,9 +39,9 @@ public class ScheduleController {
      */
     @ApiOperation("查询用户全部日程")
     @GetMapping("/list")
-    public Result list(Long userId) {
+    public Result list() {
 
-        List<Schedule> list = scheduleService.listByUserId(userId);
+        List<Schedule> list = scheduleService.listByUserId();
 
         return Result.success(list);
     }

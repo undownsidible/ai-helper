@@ -14,4 +14,6 @@ public class MessageConstant {
     public static final String NO_RIGHT = "没有权限";
     public static final String USER = "用户:";
     public static final String ASSISTANT = "助手:";
+    public static final String TIME_NULL_ERROR = "时间不能为空";
+    public static final String TIME_ERROR = "开始时间不能晚于结束时间";
 }

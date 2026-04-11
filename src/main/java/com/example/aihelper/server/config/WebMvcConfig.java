@@ -15,7 +15,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addPathPatterns(
                         "/test/**",
                         "/session/**",
-                        "/chat/**"
+                        "/chat/**",
+                        "/schedule/**"
                         )
                 .excludePathPatterns(
                         "/user/login",

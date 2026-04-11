@@ -12,7 +12,11 @@ public interface ScheduleMapper {
 
     void insert(Schedule schedule);
 
+    Schedule selectById(Long scheduleId);
+
     List<Schedule> listByUserId(Long userId);
+
+    List<Schedule> listByIds(@Param("ids") List<Long> ids);
 
     void update(Schedule schedule);
 

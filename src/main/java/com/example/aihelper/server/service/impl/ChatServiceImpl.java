@@ -1,13 +1,14 @@
 package com.example.aihelper.server.service.impl;
 
 import com.example.aihelper.common.constant.MessageConstant;
+import com.example.aihelper.common.context.UserContext;
 import com.example.aihelper.common.exception.SessionNotFoundException;
 import com.example.aihelper.pojo.dto.ChatSendDTO;
 import com.example.aihelper.pojo.entity.ChatMessage;
+import com.example.aihelper.pojo.entity.Schedule;
 import com.example.aihelper.server.mapper.ChatMessageMapper;
 import com.example.aihelper.server.mapper.SessionMapper;
-import com.example.aihelper.server.service.AIService;
-import com.example.aihelper.server.service.ChatService;
+import com.example.aihelper.server.service.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,8 @@ import java.util.List;
 @Service
 public class ChatServiceImpl implements ChatService {
 
+
+
     @Autowired
     private ChatMessageMapper chatMessageMapper;
 
@@ -30,23 +33,40 @@ public class ChatServiceImpl implements ChatService {
     @Autowired
     private AIService aiService;
 
-    // 历史消息限制
+    @Autowired
+    private EmbeddingService embeddingService;
+
+    @Autowired
+    private FaissService faissService;
+
+    @Autowired
+    private ScheduleService scheduleService;
+
     private static final int MAX_HISTORY = 10;
+
 
     @Override
     public String send(ChatSendDTO dto) {
 
+        // 1. session校验
         if (sessionMapper.getById(dto.getSessionId()) == null) {
-            throw new SessionNotFoundException(MessageConstant.SESSION_NOT_FOUND);
+            throw new RuntimeException("session不存在");
         }
 
+        // 2. 存用户消息
         ChatMessage userMsg = new ChatMessage();
         userMsg.setSessionId(dto.getSessionId());
         userMsg.setRole("user");
         userMsg.setContent(dto.getContent());
-
         chatMessageMapper.insert(userMsg);
 
+        // 3. ===== RAG部分（核心新增）=====
+        Long userId = UserContext.getUserId();
+        String context = buildRagContext(userId, dto.getContent());
+
+        log.info("RAG context:\n{}", context);
+
+        // 4. 历史消息
         List<ChatMessage> history =
                 chatMessageMapper.listRecentBySessionId(dto.getSessionId(), MAX_HISTORY);
 
@@ -54,43 +74,66 @@ public class ChatServiceImpl implements ChatService {
 
         StringBuilder promptBuilder = new StringBuilder();
 
-        int start = Math.max(0, history.size() - MAX_HISTORY);
+        // 👉 先放RAG上下文
+        promptBuilder.append("你是日程助手。\n")
+                .append("相关日程：\n")
+                .append(context)
+                .append("\n");
 
-        for (int i = start; i < history.size(); i++) {
-
-            ChatMessage msg = history.get(i);
-
+        for (ChatMessage msg : history) {
             if ("user".equals(msg.getRole())) {
-                promptBuilder.append(MessageConstant.USER)
-                        .append(msg.getContent())
-                        .append("\n");
+                promptBuilder.append("用户：").append(msg.getContent()).append("\n");
             } else {
-                promptBuilder.append(MessageConstant.ASSISTANT)
-                        .append(msg.getContent())
-                        .append("\n");
+                promptBuilder.append("助手：").append(msg.getContent()).append("\n");
             }
         }
 
-        promptBuilder.append(MessageConstant.USER)
-                .append(dto.getContent())
-                .append("\n");
-
-        promptBuilder.append(MessageConstant.ASSISTANT);
+        promptBuilder.append("用户：").append(dto.getContent()).append("\n");
+        promptBuilder.append("助手：");
 
         String prompt = promptBuilder.toString();
 
-        log.info("调用AI");
-
+        // 5. 调AI
         String reply = aiService.chat(prompt);
 
+        // 6. 存AI回复
         ChatMessage aiMsg = new ChatMessage();
         aiMsg.setSessionId(dto.getSessionId());
         aiMsg.setRole("assistant");
         aiMsg.setContent(reply);
-
         chatMessageMapper.insert(aiMsg);
 
         return reply;
+    }
+
+    /**
+     * RAG上下文构建（把你原来的RagService塞进来）
+     */
+    private String buildRagContext(Long userId, String question) {
+
+        // 1. embedding
+        List<Float> queryVec = embeddingService.embedding(question);
+
+        // 2. faiss检索
+        List<Long> ids = faissService.search(queryVec, 1);
+
+        if (ids == null || ids.isEmpty()) {
+            return "无相关日程";
+        }
+
+        // 3. 正确查数据库（必须改成这个）
+        List<Schedule> schedules = scheduleService.listByIds(ids);
+
+        // 4. 拼context
+        StringBuilder context = new StringBuilder();
+        for (Schedule s : schedules) {
+            context.append(s.getName())
+                    .append(" ")
+                    .append(s.getStartTime())
+                    .append("\n");
+        }
+
+        return context.toString();
     }
 
     @Override
