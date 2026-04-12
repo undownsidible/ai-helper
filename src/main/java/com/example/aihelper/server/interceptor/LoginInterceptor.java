@@ -40,7 +40,6 @@ public class LoginInterceptor implements HandlerInterceptor {
             }
 
             // 保存到ThreadLocal
-            log.info("线程id:{}", Thread.currentThread().getId());
             UserContext.setUserId(userId);
 
         } catch (Exception e) {

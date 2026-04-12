@@ -6,5 +6,7 @@ public interface FaissService {
 
     void add(List<Float> vector, Long id);
 
+    void remove(Long id);
+
     List<Long> search(List<Float> vector, int topK);
 }

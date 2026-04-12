@@ -32,78 +32,14 @@ public class ScheduleServiceImpl implements ScheduleService {
     @Override
     public void createSchedule(ScheduleCreateDTO dto) {
 
-        // 获取当前登录用户
         Long userId = UserContext.getUserId();
-
         if (userId == null) {
             throw new NotLoginException(MessageConstant.USER_NOT_LOGIN);
         }
 
-        //将dto复制给实体
         Schedule schedule = new Schedule();
         BeanUtils.copyProperties(dto, schedule);
 
-        if(schedule.getStartTime() == null){
-            throw new TimeErrorException(MessageConstant.TIME_NULL_ERROR);
-        }
-
-        if (schedule.getEndTime() != null &&
-                schedule.getStartTime().isAfter(schedule.getEndTime())) {
-            throw new TimeErrorException(MessageConstant.TIME_ERROR);
-        }
-
-        //设置用户ID
-        schedule.setUserId(userId);
-
-        schedule.setDeleted(0);
-        schedule.setCreateTime(LocalDateTime.now());
-        schedule.setUpdateTime(LocalDateTime.now());
-
-        scheduleMapper.insert(schedule);
-
-        //embedding
-        embedding(schedule);
-    }
-
-    @Override
-    public List<Schedule> listByUserId() {
-        Long userId = UserContext.getUserId();
-        return scheduleMapper.listByUserId(userId);
-    }
-
-    @Override
-    public List<Schedule> listByIds(List<Long> ids) {
-        if (ids == null || ids.isEmpty()) {
-            return Collections.emptyList();
-        }
-        return scheduleMapper.listByIds(ids);
-    }
-
-    @Override
-    public void updateSchedule(ScheduleUpdateDTO dto) {
-
-        // 1. 获取当前用户
-        Long userId = UserContext.getUserId();
-        if (userId == null) {
-            throw new RuntimeException(MessageConstant.USER_NOT_LOGIN);
-        }
-
-        // 2. 查询原数据（用于权限校验 + 时间校验）
-        Schedule old = scheduleMapper.selectById(dto.getId());
-        if (old == null || old.getDeleted() == 1) {
-            throw new RuntimeException("日程不存在");
-        }
-
-        // ❗ 核心：校验是否是当前用户的数据
-        if (!old.getUserId().equals(userId)) {
-            throw new RuntimeException(MessageConstant.NO_RIGHT);
-        }
-
-        // 3. DTO → Entity
-        Schedule schedule = new Schedule();
-        BeanUtils.copyProperties(dto, schedule);
-
-        // 4. 时间校验（建议补上）
         if (schedule.getStartTime() == null) {
             throw new TimeErrorException(MessageConstant.TIME_NULL_ERROR);
         }
@@ -113,22 +49,66 @@ public class ScheduleServiceImpl implements ScheduleService {
             throw new TimeErrorException(MessageConstant.TIME_ERROR);
         }
 
-        // 5. 强制绑定 userId（防止前端篡改）
         schedule.setUserId(userId);
-
-        // 6. 更新时间
+        schedule.setDeleted(0);
+        schedule.setCreateTime(LocalDateTime.now());
         schedule.setUpdateTime(LocalDateTime.now());
 
-        // 7. 执行更新
-        scheduleMapper.update(schedule);
+        scheduleMapper.insert(schedule);
 
-        //embedding
+        // ✅ 新增直接 embedding
         embedding(schedule);
     }
 
+
+    @Override
+    public void updateSchedule(ScheduleUpdateDTO dto) {
+
+        Long userId = UserContext.getUserId();
+        if (userId == null) {
+            throw new RuntimeException(MessageConstant.USER_NOT_LOGIN);
+        }
+
+        Schedule old = scheduleMapper.selectById(dto.getId());
+        if (old == null || old.getDeleted() == 1) {
+            throw new RuntimeException("日程不存在");
+        }
+
+        if (!old.getUserId().equals(userId)) {
+            throw new RuntimeException(MessageConstant.NO_RIGHT);
+        }
+
+        Schedule schedule = new Schedule();
+        BeanUtils.copyProperties(dto, schedule);
+
+        if (schedule.getStartTime() == null) {
+            throw new TimeErrorException(MessageConstant.TIME_NULL_ERROR);
+        }
+
+        if (schedule.getEndTime() != null &&
+                schedule.getStartTime().isAfter(schedule.getEndTime())) {
+            throw new TimeErrorException(MessageConstant.TIME_ERROR);
+        }
+
+        schedule.setUserId(userId);
+        schedule.setUpdateTime(LocalDateTime.now());
+
+        scheduleMapper.update(schedule);
+
+        // ✅ 关键：先删旧向量，再加新向量
+        faissService.remove(schedule.getId());
+        embedding(schedule);
+    }
+
+
     @Override
     public void deleteSchedule(Long id) {
+
+        // ✅ 删除数据库
         scheduleMapper.delete(id);
+
+        // ✅ 同步删除向量（必须）
+        faissService.remove(id);
     }
 
     // 查询今天日程
@@ -156,17 +136,21 @@ public class ScheduleServiceImpl implements ScheduleService {
         return !list.isEmpty();
     }
 
-    public void embedding(Schedule schedule){
+    public void embedding(Schedule schedule) {
         try {
-            //构造语义文本
+            // 👉 1. 先删除旧向量（关键）
+            faissService.remove(schedule.getId());
+
+            // 👉 2. 构造语义文本
             String content = buildContent(schedule);
 
-            //embedding
+            // 👉 3. embedding
             List<Float> vec = embeddingService.embedding(content);
 
-            //存入 FAISS
+            // 👉 4. 重新加入
             faissService.add(vec, schedule.getId());
-        }catch (Exception e) {
+
+        } catch (Exception e) {
             System.err.println("RAG处理失败");
             e.printStackTrace();
         }
@@ -186,5 +170,19 @@ public class ScheduleServiceImpl implements ScheduleService {
                 schedule.getName(),
                 schedule.getRemark() == null ? "无" : schedule.getRemark()
         );
+    }
+
+    @Override
+    public List<Schedule> listByUserId() {
+        Long userId = UserContext.getUserId();
+        return scheduleMapper.listByUserId(userId);
+    }
+
+    @Override
+    public List<Schedule> listByUserIdAndIds(Long userId, List<Long> ids) {
+        if (userId == null || ids == null || ids.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return scheduleMapper.listByUserIdAndIds(userId, ids);
     }
 }

@@ -56,10 +56,11 @@
 
 
     <!-- 查询日程 -->
-    <select id="listByIds" resultType="com.example.aihelper.pojo.entity.Schedule">
+    <select id="listByUserIdAndIds" resultType="com.example.aihelper.pojo.entity.Schedule">
         SELECT *
         FROM schedule
-        WHERE id IN
+        WHERE user_id = #{userId}
+        AND id IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">
             #{id}
         </foreach>

@@ -16,7 +16,10 @@ public interface ScheduleMapper {
 
     List<Schedule> listByUserId(Long userId);
 
-    List<Schedule> listByIds(@Param("ids") List<Long> ids);
+    List<Schedule> listByUserIdAndIds(
+            @Param("userId") Long userId,
+            @Param("ids") List<Long> ids
+    );
 
     void update(Schedule schedule);
 

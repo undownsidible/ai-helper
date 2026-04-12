@@ -63,9 +63,6 @@ public class ChatServiceImpl implements ChatService {
         // 3. ===== RAG部分（核心新增）=====
         Long userId = UserContext.getUserId();
         String context = buildRagContext(userId, dto.getContent());
-
-        log.info("RAG context:\n{}", context);
-
         // 4. 历史消息
         List<ChatMessage> history =
                 chatMessageMapper.listRecentBySessionId(dto.getSessionId(), MAX_HISTORY);
@@ -73,10 +70,8 @@ public class ChatServiceImpl implements ChatService {
         Collections.reverse(history);
 
         StringBuilder promptBuilder = new StringBuilder();
-
-        // 👉 先放RAG上下文
-        promptBuilder.append("你是日程助手。\n")
-                .append("相关日程：\n")
+        // 👉 RAG上下文
+        promptBuilder.append("你是日程助手。相关日程：\n")
                 .append(context)
                 .append("\n");
 
@@ -88,11 +83,12 @@ public class ChatServiceImpl implements ChatService {
             }
         }
 
-        promptBuilder.append("用户：").append(dto.getContent()).append("\n");
+        //promptBuilder.append("用户：").append(dto.getContent()).append("\n");
         promptBuilder.append("助手：");
 
         String prompt = promptBuilder.toString();
 
+        log.info("prompt:\n{}", prompt);
         // 5. 调AI
         String reply = aiService.chat(prompt);
 
@@ -105,26 +101,113 @@ public class ChatServiceImpl implements ChatService {
 
         return reply;
     }
+    @Override
+    public void streamChat(ChatSendDTO dto, SseEmitter emitter) {
 
-    /**
-     * RAG上下文构建（把你原来的RagService塞进来）
-     */
+        // 1. session校验
+        if (sessionMapper.getById(dto.getSessionId()) == null) {
+            throw new RuntimeException("session不存在");
+        }
+
+        // 2. 存用户消息
+        ChatMessage userMsg = new ChatMessage();
+        userMsg.setSessionId(dto.getSessionId());
+        userMsg.setRole("user");
+        userMsg.setContent(dto.getContent());
+        chatMessageMapper.insert(userMsg);
+
+        // 3. ===== RAG部分 =====
+        Long userId = UserContext.getUserId();
+        String context = buildRagContext(userId, dto.getContent());
+
+        // 4. 查历史消息
+        List<ChatMessage> history =
+                chatMessageMapper.listRecentBySessionId(dto.getSessionId(), MAX_HISTORY);
+
+        Collections.reverse(history);
+
+        // 5. 拼prompt
+        StringBuilder promptBuilder = new StringBuilder();
+
+        // 👉 RAG上下文
+        promptBuilder.append("你是日程助手。相关日程：\n").append(context).append("\n");
+
+        // 👉 历史对话
+        for (ChatMessage msg : history) {
+            if ("user".equals(msg.getRole())) {
+                promptBuilder.append("用户：").append(msg.getContent()).append("\n");
+            } else {
+                promptBuilder.append("助手：").append(msg.getContent()).append("\n");
+            }
+        }
+
+        // 👉 当前问题
+        //promptBuilder.append("用户：").append(dto.getContent()).append("\n");
+        promptBuilder.append("助手：");
+
+        String prompt = promptBuilder.toString();
+        log.info("prompt:\n{}", prompt);
+
+        StringBuilder fullReply = new StringBuilder();
+
+        // 6. 调AI（流式）
+        aiService.streamChat(prompt, new AIService.StreamCallback() {
+
+            @Override
+            public void onMessage(String text) {
+                try {
+                    fullReply.append(text);
+                    emitter.send(text);
+                } catch (IOException e) {
+                    emitter.completeWithError(e);
+                }
+            }
+
+            @Override
+            public void onComplete() {
+                try {
+                    emitter.complete();
+
+                    // 7. 存AI完整回复
+                    ChatMessage aiMsg = new ChatMessage();
+                    aiMsg.setSessionId(dto.getSessionId());
+                    aiMsg.setRole("assistant");
+                    aiMsg.setContent(fullReply.toString());
+                    chatMessageMapper.insert(aiMsg);
+
+                } catch (Exception e) {
+                    emitter.completeWithError(e);
+                }
+            }
+        });
+    }
+
     private String buildRagContext(Long userId, String question) {
 
         // 1. embedding
         List<Float> queryVec = embeddingService.embedding(question);
 
-        // 2. faiss检索
-        List<Long> ids = faissService.search(queryVec, 1);
+        // 2. 扩大召回（关键：从5改成50）
+        List<Long> ids = faissService.search(queryVec, 50);
 
         if (ids == null || ids.isEmpty()) {
             return "无相关日程";
         }
 
-        // 3. 正确查数据库（必须改成这个）
-        List<Schedule> schedules = scheduleService.listByIds(ids);
+        // 3. 按 userId 过滤（关键）
+        List<Schedule> schedules =
+                scheduleService.listByUserIdAndIds(userId, ids);
 
-        // 4. 拼context
+        if (schedules == null || schedules.isEmpty()) {
+            return "无相关日程";
+        }
+
+        // 4. 截断（只取前5条）
+        schedules = schedules.stream()
+                .limit(5)
+                .toList();
+
+        // 5. 拼 context
         StringBuilder context = new StringBuilder();
         for (Schedule s : schedules) {
             context.append(s.getName())
@@ -136,93 +219,9 @@ public class ChatServiceImpl implements ChatService {
         return context.toString();
     }
 
-    @Override
-    public void streamChat(ChatSendDTO dto, SseEmitter emitter) {
-
-        if (sessionMapper.getById(dto.getSessionId()) == null) {
-            throw new SessionNotFoundException(MessageConstant.SESSION_NOT_FOUND);
-        }
-
-        ChatMessage userMsg = new ChatMessage();
-        userMsg.setSessionId(dto.getSessionId());
-        userMsg.setRole("user");
-        userMsg.setContent(dto.getContent());
-
-        chatMessageMapper.insert(userMsg);
-
-        List<ChatMessage> history =
-                chatMessageMapper.listRecentBySessionId(dto.getSessionId(), MAX_HISTORY);
-
-        Collections.reverse(history);
-
-        StringBuilder promptBuilder = new StringBuilder();
-
-        for (ChatMessage msg : history) {
-
-            if ("user".equals(msg.getRole())) {
-                promptBuilder.append(MessageConstant.USER)
-                        .append(msg.getContent())
-                        .append("\n");
-            } else {
-                promptBuilder.append(MessageConstant.ASSISTANT)
-                        .append(msg.getContent())
-                        .append("\n");
-            }
-        }
-
-        promptBuilder.append(MessageConstant.USER)
-                .append(dto.getContent())
-                .append("\n");
-
-        promptBuilder.append(MessageConstant.ASSISTANT);
-
-        String prompt = promptBuilder.toString();
-
-        StringBuilder fullReply = new StringBuilder();
-
-        log.info("调用AI流式返回");
-
-        aiService.streamChat(prompt, new AIService.StreamCallback() {
-
-            @Override
-            public void onMessage(String text) {
-
-                try {
-
-                    fullReply.append(text);
-
-                    emitter.send(text);
-
-                } catch (IOException e) {
-                    emitter.completeWithError(e);
-                }
-            }
-
-            @Override
-            public void onComplete() {
-
-                try {
-
-                    emitter.complete();
-
-                    ChatMessage aiMsg = new ChatMessage();
-                    aiMsg.setSessionId(dto.getSessionId());
-                    aiMsg.setRole("assistant");
-                    aiMsg.setContent(fullReply.toString());
-
-                    chatMessageMapper.insert(aiMsg);
-
-                } catch (Exception e) {
-                    emitter.completeWithError(e);
-                }
-            }
-        });
-    }
 
     @Override
     public List<ChatMessage> listMessage(Long sessionId) {
         return chatMessageMapper.listBySessionId(sessionId);
     }
-
-
 }

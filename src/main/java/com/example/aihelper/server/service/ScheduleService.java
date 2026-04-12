@@ -12,7 +12,7 @@ public interface ScheduleService {
 
     List<Schedule> listByUserId();
 
-    List<Schedule> listByIds(List<Long> ids);
+    List<Schedule> listByUserIdAndIds(Long userId, List<Long> ids);
 
     void updateSchedule(ScheduleUpdateDTO dto);
 

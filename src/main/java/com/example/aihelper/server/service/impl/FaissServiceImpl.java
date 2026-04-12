@@ -40,6 +40,23 @@ public class FaissServiceImpl implements FaissService {
     }
 
     @Override
+    public void remove(Long id) {
+
+        String url = BASE_URL + "/remove";
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("ids", List.of(id));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        HttpEntity<Map<String, Object>> request =
+                new HttpEntity<>(body, headers);
+
+        restTemplate.postForObject(url, request, String.class);
+    }
+
+    @Override
     public List<Long> search(List<Float> vector, int topK) {
 
         String url = BASE_URL + "/search";
