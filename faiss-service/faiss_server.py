@@ -5,6 +5,7 @@ import numpy as np
 
 # 启动：
 # cd /d D:\study\Projects\ai-helper\faiss-service
+# cd /d D:\WWW\CCC\faiss-service
 # venv\Scripts\activate
 # uvicorn faiss_server:app --port 8001
 
