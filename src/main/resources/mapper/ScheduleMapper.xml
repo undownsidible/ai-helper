@@ -7,29 +7,31 @@
 <mapper namespace="com.example.aihelper.server.mapper.ScheduleMapper">
 
     <!-- 插入日程 -->
-    <insert id="insert" parameterType="com.example.aihelper.pojo.entity.Schedule">
+    <insert id="insert"
+            parameterType="com.example.aihelper.pojo.entity.Schedule"
+            useGeneratedKeys="true"
+            keyProperty="id">
+
         INSERT INTO schedule
         (
-        user_id,
-        name,
-        start_time,
-        end_time,
-        remark,
-        deleted,
-        create_time,
-        update_time
+            user_id,
+            name,
+            start_time,
+            end_time,
+            remark,
+            create_time,
+            update_time
         )
         VALUES
-        (
-        #{userId},
-        #{name},
-        #{startTime},
-        #{endTime},
-        #{remark},
-        #{deleted},
-        #{createTime},
-        #{updateTime}
-        )
+            (
+                #{userId},
+                #{name},
+                #{startTime},
+                #{endTime},
+                #{remark},
+                #{createTime},
+                #{updateTime}
+            )
     </insert>
 
     <!-- 查询用户日程 -->
@@ -44,12 +46,10 @@
         start_time,
         end_time,
         remark,
-        deleted,
         create_time,
         update_time
         FROM schedule
         WHERE user_id = #{userId}
-        AND deleted = 0
         ORDER BY start_time ASC
 
     </select>
@@ -73,7 +73,6 @@
         SELECT *
         FROM schedule
         WHERE user_id = #{userId}
-          AND deleted = 0
           AND start_time &gt;= #{start}
           AND start_time &lt; #{end}
         ORDER BY start_time
@@ -87,7 +86,6 @@
         SELECT *
         FROM schedule
         WHERE user_id = #{userId}
-          AND deleted = 0
           AND start_time &lt; #{endTime}
           AND end_time &gt; #{startTime}
 
@@ -111,16 +109,13 @@
 
     </update>
 
-    <!-- 软删除日程 -->
-    <update id="delete" parameterType="java.lang.Long">
+    <!-- 删除日程 -->
+    <delete id="delete" parameterType="java.lang.Long">
 
-        UPDATE schedule
-        SET
-        deleted = 1,
-        update_time = NOW()
+        DELETE FROM schedule
         WHERE id = #{id}
 
-    </update>
+    </delete>
 
 
 </mapper>

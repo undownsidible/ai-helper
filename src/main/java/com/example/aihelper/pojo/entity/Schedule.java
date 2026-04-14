@@ -19,8 +19,6 @@ public class Schedule {
 
     private String remark;
 
-    private Integer deleted;
-
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 

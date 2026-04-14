@@ -30,9 +30,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     @Autowired
     private FaissService faissService;
     @Override
-    public void createSchedule(ScheduleCreateDTO dto) {
-
-        Long userId = UserContext.getUserId();
+    public void createSchedule(ScheduleCreateDTO dto, Long userId) {
         if (userId == null) {
             throw new NotLoginException(MessageConstant.USER_NOT_LOGIN);
         }
@@ -50,7 +48,6 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
 
         schedule.setUserId(userId);
-        schedule.setDeleted(0);
         schedule.setCreateTime(LocalDateTime.now());
         schedule.setUpdateTime(LocalDateTime.now());
 
@@ -60,17 +57,14 @@ public class ScheduleServiceImpl implements ScheduleService {
         embedding(schedule);
     }
 
-
     @Override
-    public void updateSchedule(ScheduleUpdateDTO dto) {
-
-        Long userId = UserContext.getUserId();
+    public void updateSchedule(ScheduleUpdateDTO dto, Long userId) {
         if (userId == null) {
             throw new RuntimeException(MessageConstant.USER_NOT_LOGIN);
         }
 
         Schedule old = scheduleMapper.selectById(dto.getId());
-        if (old == null || old.getDeleted() == 1) {
+        if (old == null) {
             throw new RuntimeException("日程不存在");
         }
 
@@ -99,7 +93,6 @@ public class ScheduleServiceImpl implements ScheduleService {
         faissService.remove(schedule.getId());
         embedding(schedule);
     }
-
 
     @Override
     public void deleteSchedule(Long id) {
@@ -138,8 +131,9 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     public void embedding(Schedule schedule) {
         try {
-            // 👉 1. 先删除旧向量（关键）
-            faissService.remove(schedule.getId());
+            if (schedule.getId() != null) {
+                faissService.remove(schedule.getId());
+            }
 
             // 👉 2. 构造语义文本
             String content = buildContent(schedule);

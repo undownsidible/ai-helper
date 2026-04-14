@@ -8,8 +8,6 @@ CREATE TABLE schedule (
 
                           remark VARCHAR(500),
 
-                          deleted TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除 0未删除 1已删除',
-
                           create_time DATETIME,
                           update_time DATETIME
 );

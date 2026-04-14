@@ -1,5 +1,6 @@
 package com.example.aihelper.server.controller;
 
+import com.example.aihelper.common.context.UserContext;
 import com.example.aihelper.common.result.Result;
 import com.example.aihelper.pojo.dto.ScheduleCreateDTO;
 import com.example.aihelper.pojo.dto.ScheduleUpdateDTO;
@@ -29,7 +30,8 @@ public class ScheduleController {
     @ApiOperation("创建日程")
     public Result create(@RequestBody ScheduleCreateDTO dto) {
 
-        scheduleService.createSchedule(dto);
+        Long userId = UserContext.getUserId();
+        scheduleService.createSchedule(dto, userId);
 
         return Result.success();
     }
@@ -65,7 +67,8 @@ public class ScheduleController {
     @PutMapping
     public Result update(@RequestBody ScheduleUpdateDTO dto) {
 
-        scheduleService.updateSchedule(dto);
+        Long userId = UserContext.getUserId();
+        scheduleService.updateSchedule(dto, userId);
 
         return Result.success();
     }

@@ -8,13 +8,13 @@ import java.util.List;
 
 public interface ScheduleService {
 
-    void createSchedule(ScheduleCreateDTO dto);
+    void createSchedule(ScheduleCreateDTO dto, Long userId);
 
     List<Schedule> listByUserId();
 
     List<Schedule> listByUserIdAndIds(Long userId, List<Long> ids);
 
-    void updateSchedule(ScheduleUpdateDTO dto);
+    void updateSchedule(ScheduleUpdateDTO dto, Long userId);
 
     void deleteSchedule(Long id);
 
