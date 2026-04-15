@@ -15,7 +15,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
-@Service
+@Service("ollamaService")
 public class AIServiceImpl implements AIService {
 
     private final RestTemplate restTemplate = new RestTemplate();

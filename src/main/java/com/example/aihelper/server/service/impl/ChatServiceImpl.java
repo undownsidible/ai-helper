@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -30,6 +31,8 @@ public class ChatServiceImpl implements ChatService {
     @Autowired
     private SessionMapper sessionMapper;
 
+    //@Qualifier("ollamaService")
+    @Qualifier("apiService")
     @Autowired
     private AIService aiService;
 
@@ -243,7 +246,6 @@ public class ChatServiceImpl implements ChatService {
     }
     private String handleAiReply(String reply, Long userId) {
         ObjectMapper mapper = new ObjectMapper();
-
         try {
             JsonNode json = mapper.readTree(reply);
             String action = json.get("action").asText();
