@@ -2,7 +2,6 @@ package com.example.aihelper.server.mapper;
 
 import com.example.aihelper.pojo.entity.ChatSession;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -14,6 +13,8 @@ public interface SessionMapper {
     List<ChatSession> selectByUserId(Long userId);
 
     ChatSession getById(Long id);
+
+    void updateById(ChatSession session);
 
     void deleteById(Long id);
 }

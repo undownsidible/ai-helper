@@ -36,6 +36,14 @@
         select * from chat_session where id = #{id}
     </select>
 
+    <!-- 更新日程 -->
+    <update id="updateById">
+        UPDATE chat_session
+        SET title = #{title}
+        WHERE id = #{id}
+          AND user_id = #{userId}
+    </update>
+
     <!-- 删除会话 -->
     <delete id="deleteById">
         delete from chat_session where id = #{id}

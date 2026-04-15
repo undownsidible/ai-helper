@@ -14,7 +14,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(new LoginInterceptor())
                 .addPathPatterns(
                         "/test/**",
-                        "/session/**",
+                        "/sessions/**",
                         "/chat/**",
                         "/schedule/**"
                         )

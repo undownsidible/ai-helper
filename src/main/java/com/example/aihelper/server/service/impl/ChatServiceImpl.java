@@ -19,6 +19,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 
@@ -143,6 +144,8 @@ public class ChatServiceImpl implements ChatService {
         // 5. 拼prompt
         StringBuilder promptBuilder = new StringBuilder();
         promptBuilder.append(functionString);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        promptBuilder.append("当前时间：").append(LocalDateTime.now().format(formatter)).append("\n");
         promptBuilder.append("相关日程：\n")
                 .append(context)
                 .append("\n");
@@ -230,9 +233,9 @@ public class ChatServiceImpl implements ChatService {
                     .append("  name:")
                     .append(s.getName())
                     .append("  开始时间:")
-                    .append(s.getStartTime())
-                    .append("  结束:")
-                    .append(s.getEndTime())
+                    .append(formatTime(s.getStartTime()))
+                    .append("  结束时间:")
+                    .append(formatTime(s.getEndTime()))
                     .append("  备注:")
                     .append(s.getRemark())
                     .append("\n");
@@ -289,5 +292,9 @@ public class ChatServiceImpl implements ChatService {
             return reply;
         }
         return reply;
+    }
+    private String formatTime(LocalDateTime time) {
+        if (time == null) return "";
+        return time.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
     }
 }
